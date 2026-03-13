@@ -1,65 +1,209 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PhotoCapture } from "@/components/photo-capture";
+import { MacroDisplay } from "@/components/macro-display";
+import { ItemBreakdown } from "@/components/item-breakdown";
+import { RefinementChat } from "@/components/refinement-chat";
+import { ApiKeyInput } from "@/components/api-key-input";
+import { LoadingSkeleton } from "@/components/loading-skeleton";
+import { buildRefinementMessage } from "@/lib/prompts/refinement-prompt";
+import { API_KEY_STORAGE_KEY } from "@/lib/constants";
+import type { MealAnalysis, ConversationMessage, ImageBlock } from "@/lib/types";
+
+interface RefinementMessage {
+  role: "user" | "assistant";
+  text: string;
+}
 
 export default function Home() {
+  const [apiKey, setApiKey] = useState<string>("");
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<MealAnalysis | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
+  const [refinementHistory, setRefinementHistory] = useState<RefinementMessage[]>([]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(API_KEY_STORAGE_KEY);
+    if (stored) {
+      setApiKey(stored);
+    } else {
+      setShowKeyModal(true);
+    }
+  }, []);
+
+  const analyzeImage = useCallback(
+    async (messages: ConversationMessage[]) => {
+      if (!apiKey) {
+        setShowKeyModal(true);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages, apiKey }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          setError(data.error || "Analysis failed");
+          return;
+        }
+
+        if (data.analysis) {
+          setAnalysis(data.analysis);
+          // Add assistant response to conversation
+          setConversationHistory((prev) => [
+            ...prev,
+            { role: "assistant", content: data.rawText || "" },
+          ]);
+        }
+      } catch {
+        setError("Network error. Please check your connection and try again.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiKey]
+  );
+
+  const handleImageCapture = useCallback(
+    (base64: string, mediaType: string) => {
+      setImagePreview(`data:${mediaType};base64,${base64}`);
+      setAnalysis(null);
+      setError(null);
+      setConversationHistory([]);
+      setRefinementHistory([]);
+
+      // Build initial message with image
+      const userMessage: ConversationMessage = {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: mediaType as ImageBlock["source"]["media_type"],
+              data: base64,
+            },
+          },
+          {
+            type: "text",
+            text: "Analyze this meal and provide a complete nutritional breakdown.",
+          },
+        ],
+      };
+
+      const messages = [userMessage];
+      setConversationHistory(messages);
+      analyzeImage(messages);
+    },
+    [analyzeImage]
+  );
+
+  const handleRefinement = useCallback(
+    (text: string) => {
+      if (!imagePreview || loading) return;
+
+      setRefinementHistory((prev) => [...prev, { role: "user", text }]);
+
+      const refinementText = buildRefinementMessage(text);
+      const newMessage: ConversationMessage = {
+        role: "user",
+        content: refinementText,
+      };
+
+      const updatedHistory = [...conversationHistory, newMessage];
+      setConversationHistory(updatedHistory);
+
+      analyzeImage(updatedHistory).then(() => {
+        setRefinementHistory((prev) => [
+          ...prev,
+          { role: "assistant", text: "Analysis updated." },
+        ]);
+      });
+    },
+    [imagePreview, loading, conversationHistory, analyzeImage]
+  );
+
+  const handleClear = useCallback(() => {
+    setImagePreview(null);
+    setAnalysis(null);
+    setError(null);
+    setConversationHistory([]);
+    setRefinementHistory([]);
+  }, []);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="min-h-dvh bg-stone-50">
+      {/* Header */}
+      <header className="sticky top-0 z-10 border-b border-border bg-white/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-foreground">Glucent</h1>
+            <p className="text-[11px] text-muted-foreground -mt-0.5">AI Carb Counter for T1D</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowKeyModal(true)}
+            className="rounded-full"
+          >
+            <Settings className="h-5 w-5 text-muted-foreground" />
+          </Button>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <main className="mx-auto max-w-lg px-4 py-6 pb-32 flex flex-col gap-6">
+        <PhotoCapture
+          imagePreview={imagePreview}
+          onImageCapture={handleImageCapture}
+          onClear={handleClear}
+          disabled={loading}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {/* Error state */}
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* Loading state */}
+        {loading && <LoadingSkeleton />}
+
+        {/* Results */}
+        {analysis && !loading && (
+          <>
+            <MacroDisplay analysis={analysis} />
+            <ItemBreakdown items={analysis.items} />
+            <RefinementChat
+              history={refinementHistory}
+              onSend={handleRefinement}
+              disabled={loading}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+          </>
+        )}
       </main>
+
+      {/* API Key Modal */}
+      <ApiKeyInput
+        open={showKeyModal}
+        onOpenChange={setShowKeyModal}
+        onKeySaved={setApiKey}
+      />
     </div>
   );
 }
