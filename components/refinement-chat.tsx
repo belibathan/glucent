@@ -73,6 +73,7 @@ export function RefinementChat({ history, onSend, disabled }: RefinementChatProp
           onClick={handleSubmit}
           disabled={disabled || !input.trim()}
           className="h-[44px] w-[44px] rounded-xl shrink-0 bg-teal-600 hover:bg-teal-700"
+          aria-label="Send refinement"
         >
           <Send className="h-4 w-4" />
         </Button>

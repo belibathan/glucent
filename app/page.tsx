@@ -159,6 +159,7 @@ export default function Home() {
             size="icon"
             onClick={() => setShowKeyModal(true)}
             className="rounded-full"
+            aria-label="API key settings"
           >
             <Settings className="h-5 w-5 text-muted-foreground" />
           </Button>

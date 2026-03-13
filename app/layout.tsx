@@ -18,10 +18,27 @@ export const metadata: Metadata = {
   description:
     "Open-source AI carb counter for Type 1 Diabetes. Snap a photo, get instant macro estimates. Powered by Claude Vision.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/icons/icon-192.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "Glucent",
+  },
+  openGraph: {
+    title: "Glucent — AI Carb Counter for T1D",
+    description:
+      "Snap a photo of your meal, get instant carb estimates for insulin dosing. Open-source, privacy-first, BYOK.",
+    type: "website",
+    siteName: "Glucent",
+  },
+  twitter: {
+    card: "summary",
+    title: "Glucent — AI Carb Counter for T1D",
+    description:
+      "Snap a photo of your meal, get instant carb estimates for insulin dosing. Open-source, privacy-first, BYOK.",
   },
 };
 

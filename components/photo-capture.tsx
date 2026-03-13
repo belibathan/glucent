@@ -94,7 +94,7 @@ export function PhotoCapture({ imagePreview, onImageCapture, onClear, disabled }
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imagePreview}
-            alt="Food photo"
+            alt="Photo of your meal for nutritional analysis"
             className="w-full max-h-80 object-cover"
           />
         </div>

@@ -5,8 +5,20 @@ import { parseAnalysisResponse } from "@/lib/parse-response";
 import type { AnalyzeRequest, AnalyzeResponse } from "@/lib/types";
 import { NextResponse } from "next/server";
 
+const MAX_BODY_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_MESSAGES = 20;
+
 export async function POST(request: Request) {
   try {
+    // Guard against oversized payloads
+    const contentLength = request.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
+      return NextResponse.json(
+        { error: "Request too large. Please use a smaller image." } satisfies AnalyzeResponse,
+        { status: 413 }
+      );
+    }
+
     const body = (await request.json()) as AnalyzeRequest;
     const { messages, apiKey } = body;
 
@@ -17,9 +29,23 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!apiKey.startsWith("sk-ant-")) {
+      return NextResponse.json(
+        { error: "Invalid API key format. Anthropic keys start with 'sk-ant-'." } satisfies AnalyzeResponse,
+        { status: 401 }
+      );
+    }
+
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
         { error: "Messages are required" } satisfies AnalyzeResponse,
+        { status: 400 }
+      );
+    }
+
+    if (messages.length > MAX_MESSAGES) {
+      return NextResponse.json(
+        { error: `Too many messages. Maximum is ${MAX_MESSAGES}.` } satisfies AnalyzeResponse,
         { status: 400 }
       );
     }
