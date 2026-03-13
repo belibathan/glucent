@@ -2,7 +2,7 @@
 
 **Open-source AI carb counter for Type 1 Diabetes.**
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fbelibathan%2Fglucent&project-name=glucent&repository-name=glucent)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fbelibathan%2Fglucent)
 
 > Demo screenshot/gif coming soon
 
