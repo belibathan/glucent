@@ -11,7 +11,7 @@ import { ApiKeyInput } from "@/components/api-key-input";
 import { LoadingSkeleton } from "@/components/loading-skeleton";
 import { buildRefinementMessage } from "@/lib/prompts/refinement-prompt";
 import { API_KEY_STORAGE_KEY } from "@/lib/constants";
-import type { MealAnalysis, ConversationMessage, ImageBlock } from "@/lib/types";
+import type { MealAnalysis, ConversationMessage, ImageBlock, TokenUsage } from "@/lib/types";
 
 interface RefinementMessage {
   role: "user" | "assistant";
@@ -27,6 +27,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
   const [refinementHistory, setRefinementHistory] = useState<RefinementMessage[]>([]);
+  const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(API_KEY_STORAGE_KEY);
@@ -63,6 +64,7 @@ export default function Home() {
 
         if (data.analysis) {
           setAnalysis(data.analysis);
+          if (data.usage) setTokenUsage(data.usage);
           // Add assistant response to conversation
           setConversationHistory((prev) => [
             ...prev,
@@ -124,8 +126,21 @@ export default function Home() {
         content: refinementText,
       };
 
-      const updatedHistory = [...conversationHistory, newMessage];
-      setConversationHistory(updatedHistory);
+      // Token optimization: strip the image from the first message on refinements.
+      // The model already has the full analysis in the assistant response, so it
+      // doesn't need the image again — this saves ~1,500 tokens per refinement.
+      const optimizedHistory = conversationHistory.map((msg, i) => {
+        if (i === 0 && Array.isArray(msg.content)) {
+          return {
+            ...msg,
+            content: msg.content.filter((block) => block.type !== "image"),
+          };
+        }
+        return msg;
+      });
+
+      const updatedHistory = [...optimizedHistory, newMessage];
+      setConversationHistory([...conversationHistory, newMessage]);
 
       analyzeImage(updatedHistory).then(() => {
         setRefinementHistory((prev) => [
@@ -143,6 +158,7 @@ export default function Home() {
     setError(null);
     setConversationHistory([]);
     setRefinementHistory([]);
+    setTokenUsage(null);
   }, []);
 
   return (
@@ -195,6 +211,12 @@ export default function Home() {
               onSend={handleRefinement}
               disabled={loading}
             />
+            {tokenUsage && (
+              <p className="text-center text-[11px] text-muted-foreground/60 tabular-nums font-mono">
+                {tokenUsage.inputTokens.toLocaleString()} in / {tokenUsage.outputTokens.toLocaleString()} out
+                {tokenUsage.cacheReadTokens > 0 && ` / ${tokenUsage.cacheReadTokens.toLocaleString()} cached`}
+              </p>
+            )}
           </>
         )}
       </main>

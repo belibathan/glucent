@@ -55,7 +55,15 @@ export async function POST(request: Request) {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: SYSTEM_PROMPT,
+      // Use prompt caching on the system prompt — saves ~90% on input tokens
+      // for all requests after the first within a 5-minute window
+      system: [
+        {
+          type: "text",
+          text: SYSTEM_PROMPT,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
       messages: messages.map((msg) => ({
         role: msg.role,
         content: msg.content,
@@ -78,6 +86,12 @@ export async function POST(request: Request) {
     return NextResponse.json({
       analysis,
       rawText: textBlock.text,
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        cacheReadTokens: (response.usage as unknown as Record<string, number>).cache_read_input_tokens ?? 0,
+        cacheWriteTokens: (response.usage as unknown as Record<string, number>).cache_creation_input_tokens ?? 0,
+      },
     } satisfies AnalyzeResponse);
   } catch (error) {
     if (error instanceof Anthropic.AuthenticationError) {

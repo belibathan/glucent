@@ -52,8 +52,16 @@ export interface AnalyzeRequest {
   apiKey: string;
 }
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+}
+
 export interface AnalyzeResponse {
   analysis?: MealAnalysis;
   rawText?: string;
+  usage?: TokenUsage;
   error?: string;
 }
